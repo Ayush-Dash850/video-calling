@@ -5,18 +5,32 @@ import random
 import time 
 
 # Create your views here.
-def getToken(request): 
+def getToken(request):
     appId = 'aa594f47cfc84b1abf37055ffd3e1f29'
-    appCertificate = ''
-    channelName = request.GET.get('channel')
-    uid = random.randint(1,230)
-    expirationTimeInSeconds = 3600*24
-    currentTimeStamp = time.time()
-    privilegeExpiredTs = currentTimeStamp + expirationTimeInSeconds
-    role = 1
+    appCertificate = 'cdc2a3a3011f40d6a9b3301be43f7edf'
 
-    token = RtcTokenBuilder.buildTokenWithUid(appId, appCertificate, channelName, uid, role, privilegeExpiredTs)
-    return JsonResponse({'token':token, 'uid':uid}, safe=False)
+    channelName = request.GET.get('channel')
+    if not channelName:
+        return JsonResponse({'error': 'Channel required'}, status=400)
+
+    uid = random.randint(1, 230)
+
+    expirationTimeInSeconds = 3600 * 24
+    currentTimeStamp = int(time.time())
+    privilegeExpiredTs = currentTimeStamp + expirationTimeInSeconds
+
+    role = 1  # or RtcRole.PUBLISHER
+
+    token = RtcTokenBuilder.buildTokenWithUid(
+        appId,
+        appCertificate,
+        channelName,
+        uid,
+        role,
+        privilegeExpiredTs
+    )
+
+    return JsonResponse({'token': token, 'uid': uid})
 
 def lobby(request): 
     return render(request, 'lobby.html', {})

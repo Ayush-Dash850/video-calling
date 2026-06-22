@@ -20,7 +20,7 @@
 
     let handleSubmit = async(e) => {
         e.preventDefault()
-        let room = e.target.room.value.toUpperCase()
+        let room = e.target.room.value.trim();
 
         let response = await fetch(`/get_token/?channel=${room}`)
         let data = await response.json()
