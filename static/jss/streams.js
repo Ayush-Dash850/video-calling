@@ -120,6 +120,55 @@ let toggleMic = async (e) => {
     }
 }
 
+let participantBox = document.getElementById("participant-list");
+
+client.on("user-published", async (user, mediaType) => {
+    await client.subscribe(user, mediaType);
+
+    if (!document.getElementById(`user-${user.uid}`)) {
+        participantBox.innerHTML += `
+            <div id="user-${user.uid}">
+                User ${user.uid}
+            </div>
+        `;
+    }
+});
+
+participantBox.innerHTML += `
+    <div id="user-local">
+        You (Host)
+    </div>
+`;
+
+document.getElementById("create-breakout-btn").onclick = async () => {
+    const room = sessionStorage.getItem("room");
+
+    let res = await fetch(`/create-breakouts/?room=${room}`);
+    let data = await res.json();
+
+    console.log(data);
+};
+
+let box = document.getElementById("breakout-list");
+
+data.rooms.forEach(room => {
+    box.innerHTML += `
+        <div>
+            ${room}
+            <button onclick="joinBreakout('${room}')">Join</button>
+        </div>
+    `;
+});
+
+async function joinBreakout(roomName) {
+    await client.leave();
+
+    let response = await fetch(`/get_token/?channel=${roomName}`);
+    let data = await response.json();
+
+    await client.join(APP_ID, roomName, data.token, data.uid);
+}
+
 
 joinAndDisplayLocalStream();
 document.getElementById('leave-btn').addEventListener('click', leaveAndRemoveLocalStream)
