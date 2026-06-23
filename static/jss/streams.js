@@ -140,34 +140,6 @@ participantBox.innerHTML += `
     </div>
 `;
 
-document.getElementById("create-breakout-btn").onclick = async () => {
-    const room = sessionStorage.getItem("room");
-
-    let res = await fetch(`/create-breakouts/?room=${room}`);
-    let data = await res.json();
-
-    console.log(data);
-};
-
-let box = document.getElementById("breakout-list");
-
-data.rooms.forEach(room => {
-    box.innerHTML += `
-        <div>
-            ${room}
-            <button onclick="joinBreakout('${room}')">Join</button>
-        </div>
-    `;
-});
-
-async function joinBreakout(roomName) {
-    await client.leave();
-
-    let response = await fetch(`/get_token/?channel=${roomName}`);
-    let data = await response.json();
-
-    await client.join(APP_ID, roomName, data.token, data.uid);
-}
 
 
 joinAndDisplayLocalStream();

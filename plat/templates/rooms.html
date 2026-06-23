@@ -20,7 +20,7 @@
         <img class="icon-control" id="leave-btn" src="{% static 'img/5.png' %}">
     </div>
     <div class="icon-wrapper" id="host-controls">
-        <img class = "icon-control" data-bs-toggle="offcanvas" href="#offcanvasExample" role="button" aria-controls="offcanvasTop" src="{% static 'img/2.png' %}">
+        <img class = "icon-control" data-bs-toggle="offcanvas" href="#offcanvasExample" role="button" aria-controls="offcanvasTop" src="{% static 'img/6.png' %}">
         <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasExampleLabel">
             <div class="offcanvas-header">
                 <h5 class="offcanvas-title" id="offcanvasExampleLabel">Host Controls</h5>
@@ -29,23 +29,12 @@
             <div class="offcanvas-body">
                 <div id="participant-list">
                 </div>
-                <div class="dropdown mt-3">
-                    <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        Dropdown button
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#">Action</a></li>
-                        <li><a class="dropdown-item" href="#">Another action</a></li>
-                        <li><a class="dropdown-item" href="#">Something else here</a></li>
-                    </ul>
-                </div>
             </div>
         </div>
     </div>
 </section>
 <script type="text/javascript"src="{% static 'assets/AgoraRTC_N-4.24.3.js' %}"></script>
 <script type="text/javascript" src="{% static 'jss/streams.js' %}"></script>
-<script>
-</script>
+
 
 {% endblock %}
