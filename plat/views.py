@@ -39,3 +39,14 @@ def lobby(request):
 def rooms(request): 
     return render(request, 'rooms.html', {})
 
+def create_breakouts(request):
+    room = request.GET.get("room")
+
+    rooms = []
+
+    for i in range(1, 5):
+        rooms.append(f"{room}_room{i}")
+
+    return JsonResponse({
+        "rooms": rooms
+    })

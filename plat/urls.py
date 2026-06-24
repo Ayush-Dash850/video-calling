@@ -5,4 +5,5 @@ urlpatterns = [
     path('', views.lobby, name="home"), 
     path('rooms/', views.rooms, name="rooms"), 
     path('get_token/', views.getToken), 
+    path("create-breakouts/", views.create_breakouts, name="create_breakouts"), 
 ]

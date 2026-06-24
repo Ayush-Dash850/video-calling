@@ -1,77 +1,107 @@
 const APP_ID = 'aa594f47cfc84b1abf37055ffd3e1f29';
+
 const CHANNEL = sessionStorage.getItem('room');
 const TOKEN = sessionStorage.getItem('token');
-let UID = Number(sessionStorage.getItem('UID'))
+let UID = Number(sessionStorage.getItem('UID'));
 
 let localTracks = [];
 let remoteUsers = {};
+
+let MAIN_ROOM = CHANNEL;
+let currentRoom = CHANNEL;
 
 const client = AgoraRTC.createClient({
     mode: 'rtc',
     codec: 'vp8'
 });
 
+// ---------------- EVENTS ----------------
 client.on('user-published', handleUserJoined);
 client.on('user-left', handleUserLeft);
 
-async function joinAndDisplayLocalStream() {
-    document.getElementById('room-name').innerText = CHANNEL
+// ---------------- CORE ROOM SWITCH ----------------
+async function joinRoom(roomName) {
+    console.log("Switching to room:", roomName);
 
-   try{
-    await client.join(APP_ID, CHANNEL, TOKEN, UID)
-   }catch(error){
-        console.error(error)
-        window.open('', '_self')
-   }
+    currentRoom = roomName;
+    sessionStorage.setItem("currentRoom", roomName);
 
+    // leave safely
+    try {
+        await client.leave();
+    } catch (e) {
+        console.log("Leave ignored:", e);
+    }
+
+    // stop & close tracks
+    if (localTracks.length > 0) {
+        localTracks.forEach(track => {
+            track.stop();
+            track.close();
+        });
+    }
+    localTracks = [];
+
+    // clear UI
+    const videoBox = document.getElementById("video-streams");
+    if (videoBox) videoBox.innerHTML = "";
+
+    // get token
+    let res = await fetch(`/get_token/?channel=${roomName}`);
+    let data = await res.json();
+
+    // join Agora
+    await client.join(APP_ID, roomName, data.token, data.uid);
+
+    // create tracks
     localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
 
-    let player = `
-        <div class="video-container" id="user-container-${UID}">
-            <div>
-                <span class="username-wrapper">Me</span>
+    // render local user
+    if (videoBox) {
+        videoBox.innerHTML = `
+            <div class="video-container">
+                <div><span class="username-wrapper">Me</span></div>
+                <div class="video-player" id="user-${data.uid}"></div>
             </div>
-            <div class="video-player" id="user-${UID}"></div>
-        </div>
-    `;
+        `;
+    }
 
-    document.getElementById('video-streams')
-        .insertAdjacentHTML('beforeend', player);
-
-    localTracks[1].play(`user-${UID}`);
+    localTracks[1].play(`user-${data.uid}`);
 
     await client.publish(localTracks);
 }
 
-async function handleUserJoined(user, mediaType) {
+// ---------------- START MAIN ROOM ----------------
+async function joinAndDisplayLocalStream() {
+    const roomLabel = document.getElementById('room-name');
+    if (roomLabel) roomLabel.innerText = CHANNEL;
 
+    await joinRoom(CHANNEL);
+}
+
+// ---------------- REMOTE USERS ----------------
+async function handleUserJoined(user, mediaType) {
     remoteUsers[user.uid] = user;
 
     await client.subscribe(user, mediaType);
 
     if (mediaType === 'video') {
 
-        let player = document.getElementById(
-            `user-container-${user.uid}`
-        );
+        let existing = document.getElementById(`user-container-${user.uid}`);
+        if (existing) existing.remove();
 
-        if (player) {
-            player.remove();
-        }
+        const videoBox = document.getElementById("video-streams");
 
-        player = `
-            <div class="video-container" id="user-container-${user.uid}">
-                <div>
-                    <span class="username-wrapper">
-                        User ${user.uid}
-                    </span>
+        if (videoBox) {
+            videoBox.insertAdjacentHTML("beforeend", `
+                <div class="video-container" id="user-container-${user.uid}">
+                    <div>
+                        <span class="username-wrapper">User ${user.uid}</span>
+                    </div>
+                    <div class="video-player" id="user-${user.uid}"></div>
                 </div>
-                <div class="video-player" id="user-${user.uid}"></div>
-            </div>
-        `;
-
-        document.getElementById('video-streams')
-            .insertAdjacentHTML('beforeend', player);
+            `);
+        }
 
         user.videoTrack.play(`user-${user.uid}`);
     }
@@ -82,67 +112,82 @@ async function handleUserJoined(user, mediaType) {
 }
 
 function handleUserLeft(user) {
-
     delete remoteUsers[user.uid];
 
-    let player = document.getElementById(
-        `user-container-${user.uid}`
-    );
-
-    if (player) {
-        player.remove();
-    }
+    let el = document.getElementById(`user-container-${user.uid}`);
+    if (el) el.remove();
 }
 
+// ---------------- CONTROLS ----------------
 let leaveAndRemoveLocalStream = async () => {
-    for(let i=0; localTracks.length > i; i++ ){
-        localTracks[i].stop() 
-        localTracks[i].close()
+
+    if (localTracks.length > 0) {
+        localTracks.forEach(track => {
+            track.stop();
+            track.close();
+        });
     }
 
-    await client.leave()
-    window.open('/','_self')
+    await client.leave();
+    window.open('/', '_self');
+};
+
+let toggleCamera = async () => {
+    localTracks[1].setMuted(!localTracks[1].muted);
+};
+
+let toggleMic = async () => {
+    localTracks[0].setMuted(!localTracks[0].muted);
+};
+
+// ---------------- BREAKOUT SYSTEM ----------------
+let breakoutRooms = [];
+
+// create breakout rooms
+const breakoutBtn = document.getElementById("create-breakout-btn");
+
+if (breakoutBtn) {
+    breakoutBtn.onclick = async () => {
+
+        const room = sessionStorage.getItem("room");
+
+        let res = await fetch(`/create-breakouts/?room=${room}`);
+        let data = await res.json();
+
+        breakoutRooms = data.rooms;
+
+        let box = document.getElementById("breakout-list");
+        if (!box) return;
+
+        box.innerHTML = "";
+
+        breakoutRooms.forEach(r => {
+            box.innerHTML += `
+                <div class="mb-2">
+                    <b>${r}</b>
+                    <button class="btn btn-sm btn-primary"
+                        onclick="joinBreakout('${r}')">
+                        Join
+                    </button>
+                </div>
+            `;
+        });
+    };
 }
 
-let toggleCamera = async (e) => {
-    if(localTracks[1].muted){
-        await localTracks[1].setMuted(false)
-    }else{
-        await localTracks[1].setMuted(true)
-    }
+// join breakout
+async function joinBreakout(roomName) {
+    await joinRoom(roomName);
 }
 
-let toggleMic = async (e) => {
-    if(localTracks[0].muted){
-        await localTracks[0].setMuted(false)
-    }else{
-        await localTracks[0].setMuted(true)
-    }
+// return main room
+function returnToMainRoom() {
+    joinRoom(MAIN_ROOM);
 }
 
-let participantBox = document.getElementById("participant-list");
-
-client.on("user-published", async (user, mediaType) => {
-    await client.subscribe(user, mediaType);
-
-    if (!document.getElementById(`user-${user.uid}`)) {
-        participantBox.innerHTML += `
-            <div id="user-${user.uid}">
-                User ${user.uid}
-            </div>
-        `;
-    }
-});
-
-participantBox.innerHTML += `
-    <div id="user-local">
-        You (Host)
-    </div>
-`;
-
-
-
+// ---------------- START APP ----------------
 joinAndDisplayLocalStream();
-document.getElementById('leave-btn').addEventListener('click', leaveAndRemoveLocalStream)
-document.getElementById('mic-btn').addEventListener('click', toggleMic)
-document.getElementById('cam-btn').addEventListener('click', toggleCamera)
+
+document.getElementById('leave-btn')?.addEventListener('click', leaveAndRemoveLocalStream);
+document.getElementById('mic-btn')?.addEventListener('click', toggleMic);
+document.getElementById('cam-btn')?.addEventListener('click', toggleCamera);
