@@ -11,16 +11,22 @@ def getToken(request):
     appCertificate = 'cdc2a3a3011f40d6a9b3301be43f7edf'
 
     channelName = request.GET.get('channel')
+    uid = request.GET.get('uid')
+
     if not channelName:
         return JsonResponse({'error': 'Channel required'}, status=400)
 
-    uid = random.randint(1, 230)
+    # 🚨 CRITICAL FIX: use frontend UID if provided
+    if uid is None:
+        uid = random.randint(1, 230)
+    else:
+        uid = int(uid)
 
     expirationTimeInSeconds = 3600 * 24
     currentTimeStamp = int(time.time())
     privilegeExpiredTs = currentTimeStamp + expirationTimeInSeconds
 
-    role = 1  # or RtcRole.PUBLISHER
+    role = 1
 
     token = RtcTokenBuilder.buildTokenWithUid(
         appId,

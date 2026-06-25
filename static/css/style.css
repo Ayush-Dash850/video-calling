@@ -1,16 +1,7 @@
-body{
-    background-color: black;
-    color: white;
-}
+@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@100..900&display=swap');
 
-.home-card{
-    border: 2px;
-    border-radius: 10px;
-    border-color: white;
-    height: 80vh;
-    width: 30vw;
-    background-color: white;
-    color: black;
+body{
+    font-family: 'League Spartan';
 }
 
 /*Room Styling*/

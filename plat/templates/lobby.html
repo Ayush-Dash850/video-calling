@@ -1,20 +1,35 @@
 {% extends 'base.html' %}
 {% load static %}
 {% block content %} 
+   <div class="container vh-100 d-flex justify-content-center align-items-center">
+    <div class="card shadow-lg border-0 p-4" style="width: 40vw; height: 40vh;">
+        
+        <div class="text-center mb-4">
+            <h1 class="fw-bold">Crewship</h1>
+            <p class="text-muted">Enter a room name to join</p>
+        </div>
 
-<div class="d-flex justify-content-center align-items-center vh-100">
-    <div class="home-card">
-       <form id="form">
-        <div class="form-field">
-            <input type="text" name="room" placeholder="Enter a room name..." style="text-transform: uppercase;"/>
-        </div>
-        <div class="form-field">
-            <input type="submit" value="Join Stream" />
-        </div>
-       </form>
+        <form id="form">
+            <div class="mb-3">
+                <label class="form-label">Room Name</label>
+                <input
+                    type="text"
+                    name="room"
+                    class="form-control"
+                    placeholder="Enter a room name..."
+                    required
+                >
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    Join Stream
+                </button>
+            </div>
+        </form>
+
     </div>
 </div>
-
 <script type="text/javascript">
     let form = document.getElementById('form')
 

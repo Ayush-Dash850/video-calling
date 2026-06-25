@@ -9,6 +9,7 @@
 </section>
 
 <section id="video-streams"></section>
+<section id="screen-container"></section>
 <section id="control-wrapper">
     <div class="icon-wrapper">
         <img class="icon-control" id="mic-btn" src="{% static 'img/1.png' %}">
@@ -19,11 +20,14 @@
     <div class="icon-wrapper">
         <img class="icon-control" id="leave-btn" src="{% static 'img/5.png' %}">
     </div>
+    <div class="icon-wrapper">
+        <img class="icon-control" id="share-screen-btn" src="{% static 'img/7.png' %}">
+    </div>
     <div class="icon-wrapper" id="host-controls">
         <img class = "icon-control" data-bs-toggle="offcanvas" href="#offcanvasExample" role="button" aria-controls="offcanvasTop" src="{% static 'img/6.png' %}">
         <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasExampleLabel">
             <div class="offcanvas-header">
-                <h5 class="offcanvas-title" id="offcanvasExampleLabel">Host Controls</h5>
+                <h5 class="offcanvas-title" id="offcanvasExampleLabel">Breakout Rooms</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
             <div class="offcanvas-body">
@@ -33,9 +37,11 @@
                     Create Breakout Rooms
                 </button>
                 <div id="breakout-list"></div>
-                <button onclick="returnToMainRoom()" class="btn btn-success">
-                    Main Room
-                </button>
+                <div class="py-3">
+                    <button onclick="returnToMainRoom()" class="btn btn-success">
+                        Main Room
+                    </button>
+                </div>
             </div>
         </div>
     </div>
