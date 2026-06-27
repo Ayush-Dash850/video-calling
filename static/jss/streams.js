@@ -2,6 +2,7 @@ const APP_ID = 'aa594f47cfc84b1abf37055ffd3e1f29';
 
 const CHANNEL = sessionStorage.getItem('room');
 let UID = Number(sessionStorage.getItem('UID'));
+let NAME = sessionStorage.getItem('name');
 
 let localTracks = [];
 let remoteUsers = {};
@@ -9,87 +10,141 @@ let remoteUsers = {};
 let MAIN_ROOM = CHANNEL;
 let currentRoom = CHANNEL;
 
-// ---------------- CLIENTS ----------------
+// ---------------- ROOM DISPLAY ----------------
+function updateRoomUI() {
+    const label = document.getElementById("room-name");
+    if (!label) return;
+
+    if (currentRoom === MAIN_ROOM) {
+        label.innerText = `Main Room: ${currentRoom}`;
+    } else {
+        label.innerText = `Breakout Room: ${currentRoom}`;
+    }
+}
+
+// ---------------- ROOM MEMBERS ----------------
+async function createMember() {
+    try {
+        await fetch('/create_member/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: NAME,
+                UID: String(UID),
+                room_name: currentRoom
+            })
+        });
+    } catch (e) {}
+}
+
+async function getMember(uid) {
+    try {
+        let res = await fetch(`/get_member/?UID=${uid}&room_name=${currentRoom}`);
+        return await res.json();
+    } catch (e) {
+        return { name: `User ${uid}` };
+    }
+}
+
+async function deleteMember(room = currentRoom, uid = UID) {
+    try {
+        await fetch('/delete_member/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: NAME,
+                UID: String(uid),
+                room_name: room
+            })
+        });
+    } catch (e) {}
+}
+
+// ---------------- PARTICIPANTS ----------------
+async function loadParticipants() {
+    const box = document.getElementById("participant-list");
+    if (!box) return;
+
+    try {
+        let res = await fetch(`/get_room_members/?room_name=${currentRoom}`);
+        let data = await res.json();
+
+        box.innerHTML = "";
+
+        data.members.forEach(m => {
+            box.innerHTML += `<div>${m.name}</div>`;
+        });
+
+    } catch (e) {}
+}
+
+// ---------------- AGORA ----------------
 const client = AgoraRTC.createClient({
     mode: 'rtc',
     codec: 'vp8'
 });
 
-const screenClient = AgoraRTC.createClient({
-    mode: 'rtc',
-    codec: 'vp8'
-});
-
-let screenTrack = null;
-let screenUid = null;
-let sharing = false;
-
-// ---------------- EVENTS ----------------
 client.on('user-published', handleUserJoined);
 client.on('user-left', handleUserLeft);
 
-// ---------------- JOIN ROOM ----------------
+// ---------------- JOIN ROOM CORE ----------------
 async function joinRoom(roomName) {
 
-    console.log("Switching to room:", roomName);
-
+    let oldRoom = currentRoom;
     currentRoom = roomName;
+
     sessionStorage.setItem("currentRoom", roomName);
 
-    // stop screen share if active
-    if (screenTrack) {
-        await stopScreenShare();
+    updateRoomUI();
+
+    // remove from old room
+    if (oldRoom) {
+        await deleteMember(oldRoom, UID).catch(() => {});
     }
 
-    // leave main client safely
-    try {
-        await client.leave();
-    } catch (e) {}
-
-    // stop local tracks
+    // stop old tracks
     if (localTracks.length > 0) {
-        localTracks.forEach(track => {
-            track.stop();
-            track.close();
+        localTracks.forEach(t => {
+            try { t.stop(); t.close(); } catch (e) {}
         });
     }
     localTracks = [];
 
-    // clear UI
+    try { await client.leave(); } catch (e) {}
+
     const videoBox = document.getElementById("video-streams");
     if (videoBox) videoBox.innerHTML = "";
 
-    // get token
+    // token
     let res = await fetch(`/get_token/?channel=${roomName}`);
     let data = await res.json();
 
-    // join main client
     await client.join(APP_ID, roomName, data.token, data.uid);
 
-    // create camera + mic
+    UID = data.uid;
+
+    await createMember();
+    await loadParticipants();
+
     localTracks = await AgoraRTC.createMicrophoneAndCameraTracks();
 
-    // render local
     if (videoBox) {
         videoBox.innerHTML = `
             <div class="video-container">
-                <div><span class="username-wrapper">Me</span></div>
-                <div class="video-player" id="user-${data.uid}"></div>
+                <div>
+                    <span class="username-wrapper">${NAME || "Anonymous"}</span>
+                </div>
+                <div class="video-player" id="user-${UID}"></div>
             </div>
         `;
     }
 
-    localTracks[1].play(`user-${data.uid}`);
-
+    localTracks[1].play(`user-${UID}`);
     await client.publish(localTracks);
 }
 
-// ---------------- START APP ----------------
+// ---------------- START ----------------
 async function joinAndDisplayLocalStream() {
-
-    const roomLabel = document.getElementById('room-name');
-    if (roomLabel) roomLabel.innerText = CHANNEL;
-
     await joinRoom(CHANNEL);
 }
 
@@ -100,185 +155,89 @@ async function handleUserJoined(user, mediaType) {
 
     await client.subscribe(user, mediaType);
 
-    // ---------------- SCREEN SHARE ----------------
-    if (String(user.uid).includes("-screen")) {
-
-        const screenBox = document.getElementById("screen-container");
-
-        if (mediaType === "video" && screenBox) {
-            screenBox.innerHTML = "";
-            user.videoTrack.play("screen-container");
-        }
-
-        return;
-    }
-
-    // ---------------- NORMAL USERS ----------------
-    if (mediaType === 'video') {
+    if (mediaType === "video") {
 
         let existing = document.getElementById(`user-container-${user.uid}`);
         if (existing) existing.remove();
 
-        const videoBox = document.getElementById("video-streams");
+        let member = await getMember(user.uid);
 
-        if (videoBox) {
-            videoBox.insertAdjacentHTML("beforeend", `
-                <div class="video-container" id="user-container-${user.uid}">
-                    <div>
-                        <span class="username-wrapper">User ${user.uid}</span>
-                    </div>
-                    <div class="video-player" id="user-${user.uid}"></div>
+        const box = document.getElementById("video-streams");
+
+        box.insertAdjacentHTML("beforeend", `
+            <div class="video-container" id="user-container-${user.uid}">
+                <div>
+                    <span class="username-wrapper">
+                        ${member.name || `User ${user.uid}`}
+                    </span>
                 </div>
-            `);
-        }
+                <div class="video-player" id="user-${user.uid}"></div>
+            </div>
+        `);
 
         user.videoTrack.play(`user-${user.uid}`);
     }
 
-    if (mediaType === 'audio') {
+    if (mediaType === "audio") {
         user.audioTrack.play();
     }
+
+    loadParticipants();
 }
 
+// ---------------- USER LEFT ----------------
 function handleUserLeft(user) {
-
     delete remoteUsers[user.uid];
 
     let el = document.getElementById(`user-container-${user.uid}`);
     if (el) el.remove();
+
+    loadParticipants();
 }
 
 // ---------------- CONTROLS ----------------
-let leaveAndRemoveLocalStream = async () => {
-
-    if (screenTrack) {
-        await stopScreenShare();
-    }
+async function leaveAndRemoveLocalStream() {
 
     if (localTracks.length > 0) {
-        localTracks.forEach(track => {
-            track.stop();
-            track.close();
+        localTracks.forEach(t => {
+            try { t.stop(); t.close(); } catch (e) {}
         });
     }
 
+    await deleteMember(currentRoom, UID).catch(() => {});
     await client.leave();
+
     window.open('/', '_self');
-};
+}
 
-let toggleCamera = async () => {
+function toggleCamera() {
     localTracks[1].setMuted(!localTracks[1].muted);
-};
+}
 
-let toggleMic = async () => {
+function toggleMic() {
     localTracks[0].setMuted(!localTracks[0].muted);
-};
+}
 
-// ---------------- SCREEN SHARE ----------------
-async function startScreenShare() {
+// ---------------- BREAKOUT ----------------
+document.getElementById("create-breakout-btn")?.addEventListener("click", async () => {
 
-    // FIX: Agora requires numeric UID
-    screenUid = UID + 100000;
+    let res = await fetch(`/create-breakouts/?room=${MAIN_ROOM}`);
+    let data = await res.json();
 
-    const res = await fetch(
-        `/get_token/?channel=${currentRoom}&uid=${screenUid}`
-    );
+    let box = document.getElementById("breakout-list");
+    if (!box) return;
 
-    const data = await res.json();
+    box.innerHTML = "";
 
-    await screenClient.join(
-        APP_ID,
-        currentRoom,
-        data.token,
-        screenUid
-    );
-
-    screenTrack = await AgoraRTC.createScreenVideoTrack();
-
-    await screenClient.publish(screenTrack);
-
-    screenTrack.on("track-ended", async () => {
-        await stopScreenShare();
+    data.rooms.forEach(r => {
+        box.innerHTML += `
+            <div>
+                <b>${r}</b>
+                <button onclick="joinBreakout('${r}')">Join</button>
+            </div>
+        `;
     });
-
-    console.log("Screen sharing started");
-}
-
-async function stopScreenShare() {
-
-    if (!screenTrack) return;
-
-    await screenClient.unpublish(screenTrack);
-
-    screenTrack.close();
-
-    await screenClient.leave();
-
-    screenTrack = null;
-    sharing = false;
-
-    const screenBox = document.getElementById("screen-container");
-    if (screenBox) screenBox.innerHTML = "";
-
-    const btn = document.getElementById("share-screen-btn");
-    if (btn) btn.textContent = "Share Screen";
-
-    console.log("Screen sharing stopped");
-}
-
-// ---------------- BUTTON ----------------
-const shareBtn = document.getElementById("share-screen-btn");
-
-if (shareBtn) {
-
-    shareBtn.addEventListener("click", async () => {
-
-        if (!sharing) {
-            await startScreenShare();
-            sharing = true;
-            shareBtn.textContent = "Stop Sharing";
-        } else {
-            await stopScreenShare();
-            sharing = false;
-            shareBtn.textContent = "Share Screen";
-        }
-    });
-}
-
-// ---------------- BREAKOUT ROOMS ----------------
-let breakoutRooms = [];
-
-const breakoutBtn = document.getElementById("create-breakout-btn");
-
-if (breakoutBtn) {
-
-    breakoutBtn.onclick = async () => {
-
-        const room = sessionStorage.getItem("room");
-
-        let res = await fetch(`/create-breakouts/?room=${room}`);
-        let data = await res.json();
-
-        breakoutRooms = data.rooms;
-
-        let box = document.getElementById("breakout-list");
-        if (!box) return;
-
-        box.innerHTML = "";
-
-        breakoutRooms.forEach(r => {
-            box.innerHTML += `
-                <div class="mb-2 px-2 py-3">
-                    <b>${r}</b>
-                    <button class="btn btn-sm btn-primary"
-                        onclick="joinBreakout('${r}')">
-                        Join
-                    </button>
-                </div>
-            `;
-        });
-    };
-}
+});
 
 async function joinBreakout(roomName) {
     await joinRoom(roomName);
@@ -288,7 +247,7 @@ function returnToMainRoom() {
     joinRoom(MAIN_ROOM);
 }
 
-// ---------------- START ----------------
+// ---------------- INIT ----------------
 joinAndDisplayLocalStream();
 
 document.getElementById('leave-btn')?.addEventListener('click', leaveAndRemoveLocalStream);

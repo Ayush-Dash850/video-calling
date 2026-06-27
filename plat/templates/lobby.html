@@ -12,6 +12,16 @@
 
         <form id="form">
             <div class="mb-3">
+                <label class="form-label">Your Name</label>
+                <input
+                    type="text"
+                    name="name"
+                    class="form-control"
+                    placeholder="Enter your name..."
+                    required
+                >
+            </div>
+            <div class="mb-3">
                 <label class="form-label">Room Name</label>
                 <input
                     type="text"
@@ -32,25 +42,30 @@
     </div>
 </div>
 <script type="text/javascript">
-    let form = document.getElementById('form')
+    let form = document.getElementById('form');
 
-    let handleSubmit = async(e) => {
-        e.preventDefault()
+    let handleSubmit = async (e) => {
+        e.preventDefault();
+
         let room = e.target.room.value.trim();
+        let name = e.target.name.value.trim();   // ✅ ADD THIS
 
-        let response = await fetch(`/get_token/?channel=${room}`)
-        let data = await response.json()
+        let response = await fetch(`/get_token/?channel=${room}`);
+        let data = await response.json();
 
-        let UID = data.uid 
-        let token = data.token
+        let UID = data.uid;
+        let token = data.token;
 
-        sessionStorage.setItem('UID', UID)
-        sessionStorage.setItem('token', token)
-        sessionStorage.setItem('room', room)
+        sessionStorage.setItem('UID', UID);
+        sessionStorage.setItem('token', token);
+        sessionStorage.setItem('room', room);
 
-        window.open('/rooms','_self')
-    }
-    form.addEventListener('submit', handleSubmit)
+        sessionStorage.setItem('name', name);   // ✅ CRITICAL FIX
+
+        window.open('/rooms', '_self');
+    };
+
+    form.addEventListener('submit', handleSubmit);
 </script>
 
 {% endblock %}
