@@ -92,9 +92,7 @@ client.on('user-left', handleUserLeft);
 
 // ---------------- RENDER TILE (deduplicated) ----------------
 async function renderUserTile(uid, videoTrack, box) {
-    // Check 1: already in DOM
     if (document.getElementById(`user-container-${uid}`)) return;
-    // Check 2: currently being rendered by another async path
     if (renderingUsers.has(uid)) return;
 
     renderingUsers.add(uid);
@@ -102,8 +100,6 @@ async function renderUserTile(uid, videoTrack, box) {
     try {
         const member = await getMember(uid);
 
-        // Check 3: re-check after async getMember — another path may have
-        // finished rendering while we were awaiting the fetch
         if (document.getElementById(`user-container-${uid}`)) return;
 
         box.insertAdjacentHTML("beforeend", `
@@ -141,7 +137,7 @@ async function joinRoom(roomName) {
 
         const videoBox = document.getElementById("video-streams");
         if (videoBox) videoBox.innerHTML = "";
-        renderingUsers.clear(); // clear lock on room change
+        renderingUsers.clear();
 
         const res = await fetch(`/get_token/?channel=${roomName}`);
         if (!res.ok) throw new Error(`Token fetch failed: ${res.status}`);
@@ -155,7 +151,6 @@ async function joinRoom(roomName) {
         await createMember();
         await loadParticipants();
 
-        // Subscribe to users already in the room, skipping ourselves
         for (const user of client.remoteUsers) {
             if (user.uid === UID) continue;
 
@@ -260,7 +255,7 @@ async function startScreenShare() {
         if (!res.ok) throw new Error(`Token fetch failed: ${res.status}`);
         const data = await res.json();
 
-        await screenClient.join(APP_ID, currentRoom, data.token, null);
+        await screenClient.join(APP_ID, currentRoom, data.token, data.uid);
 
         screenTrack = await AgoraRTC.createScreenVideoTrack({
             encoderConfig: "1080p_1",
