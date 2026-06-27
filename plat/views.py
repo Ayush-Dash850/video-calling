@@ -19,7 +19,8 @@ def getToken(request):
         return JsonResponse({'error': 'Channel required'}, status=400)
 
     if uid is None:
-        uid = random.randint(1, 230)
+        # Use a large range to avoid collisions in production
+        uid = random.randint(1, 2**31 - 1)
     else:
         uid = int(uid)
 
