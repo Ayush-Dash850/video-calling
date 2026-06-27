@@ -75,9 +75,21 @@ async function loadParticipants() {
         const res = await fetch(`/get_room_members/?room_name=${currentRoom}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+
+        // Build set of live UIDs from Agora (remote users + ourselves)
+        const liveUIDs = new Set(client.remoteUsers.map(u => String(u.uid)));
+        liveUIDs.add(String(UID));
+
         box.innerHTML = "";
         data.members.forEach(m => {
-            box.innerHTML += `<div>${m.name}</div>`;
+            // Support both m.UID and m.uid from the backend
+            const memberUID = String(m.UID ?? m.uid ?? '');
+            if (liveUIDs.has(memberUID)) {
+                box.innerHTML += `<div>${m.name}</div>`;
+            } else {
+                // Stale record — clean it up
+                deleteMember(currentRoom, memberUID);
+            }
         });
     } catch (e) {
         console.error('loadParticipants error:', e);
@@ -121,12 +133,17 @@ async function joinRoom(roomName) {
     joiningRoom = true;
 
     const oldRoom = currentRoom;
+    const oldUID = UID;
+
     currentRoom = roomName;
     sessionStorage.setItem("currentRoom", roomName);
     updateRoomUI();
 
     try {
-        if (oldRoom) await deleteMember(oldRoom, UID);
+        // Delete from old room using captured oldRoom/oldUID before they change
+        if (oldRoom) await deleteMember(oldRoom, oldUID);
+
+        if (isScreenSharing) await stopScreenShare();
 
         if (localTracks.length > 0) {
             localTracks.forEach(t => { try { t.stop(); t.close(); } catch (e) {} });
@@ -138,6 +155,7 @@ async function joinRoom(roomName) {
         const videoBox = document.getElementById("video-streams");
         if (videoBox) videoBox.innerHTML = "";
         renderingUsers.clear();
+        remoteUsers = {};
 
         const res = await fetch(`/get_token/?channel=${roomName}`);
         if (!res.ok) throw new Error(`Token fetch failed: ${res.status}`);
@@ -217,6 +235,8 @@ function handleUserLeft(user) {
     delete remoteUsers[user.uid];
     const el = document.getElementById(`user-container-${user.uid}`);
     if (el) el.remove();
+    // Explicitly clean up their DB record in case beforeunload didn't fire
+    deleteMember(currentRoom, user.uid);
     loadParticipants();
 }
 
@@ -248,6 +268,8 @@ function toggleMic() {
 
 // ---------------- SCREEN SHARE ----------------
 async function startScreenShare() {
+    if (isScreenSharing) return;
+
     try {
         screenClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
@@ -288,12 +310,15 @@ async function startScreenShare() {
 
     } catch (e) {
         console.error('startScreenShare error:', e);
+        // Full cleanup on any failure (including user cancelling the picker)
         if (screenClient) {
             try { await screenClient.leave(); } catch (_) {}
             screenClient = null;
         }
         screenTrack = null;
         isScreenSharing = false;
+        const btn = document.getElementById('share-screen-btn');
+        if (btn) btn.innerText = "Share Screen";
     }
 }
 
@@ -359,6 +384,17 @@ function returnToMainRoom() {
 
 // ---------------- INIT ----------------
 joinAndDisplayLocalStream();
+
+// Clean up on tab close / refresh
+window.addEventListener('beforeunload', () => {
+    navigator.sendBeacon(
+        '/delete_member/',
+        new Blob(
+            [JSON.stringify({ name: NAME, UID: String(UID), room_name: currentRoom })],
+            { type: 'application/json' }
+        )
+    );
+});
 
 document.getElementById('leave-btn')?.addEventListener('click', leaveAndRemoveLocalStream);
 document.getElementById('mic-btn')?.addEventListener('click', toggleMic);
