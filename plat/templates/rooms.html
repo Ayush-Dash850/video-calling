@@ -4,12 +4,14 @@
 
 {% block content %}
 
-<section>
+<section class="container-fluid">
     <p><span id="room-name"></span></p>
 </section>
 
 <section id="video-streams"></section>
+
 <section id="screen-container"></section>
+
 <section id="control-wrapper">
     <div class="icon-wrapper">
         <img class="icon-control" id="mic-btn" src="{% static 'img/1.png' %}">
@@ -27,25 +29,30 @@
         <img class = "icon-control" data-bs-toggle="offcanvas" href="#offcanvasExample" role="button" aria-controls="offcanvasTop" src="{% static 'img/6.png' %}">
         <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasExampleLabel">
             <div class="offcanvas-header">
-                <h5 class="offcanvas-title" id="offcanvasExampleLabel">Breakout Rooms</h5>
+                <h5 class="offcanvas-title" id="offcanvasExampleLabel">Meeting Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
             <div class="offcanvas-body">
-                <div id="participant-list">
+                <div>
+                    <h6>Participants</h6>
                 </div>
-                <button class="btn btn-primary" id="create-breakout-btn">
-                    Create Breakout Rooms
-                </button>
-                <div id="breakout-list"></div>
-                <div class="py-3">
-                    <button onclick="returnToMainRoom()" class="btn btn-success">
-                        Main Room
+                <div id="participant-list" class="pb-3"></div>
+                <div>
+                    <button class="btn btn-primary" id="create-breakout-btn">
+                        Join Breakout Rooms 
                     </button>
+                    <div id="breakout-list"></div>
+                    <div class="py-3">
+                        <button onclick="returnToMainRoom()" class="btn btn-success">
+                            Join Main Room
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </section>
+
 <script type="text/javascript"src="{% static 'assets/AgoraRTC_N-4.24.3.js' %}"></script>
 <script type="text/javascript" src="{% static 'jss/streams.js' %}"></script>
 
